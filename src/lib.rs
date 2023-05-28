@@ -1,63 +1,17 @@
+use anygrep::{android_strgrep, minigrep};
 use std::{env, error::Error, fs};
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn one_result() {
-        let query = "duct";
-        let contents = "\
-Rust:
-safe, fast, productive.
-Pick three.";
-        assert_eq!(vec!["safe, fast, productive."], search(query, contents));
-    }
-
-    #[test]
-    fn case_insensitive() {
-        let query = "rUsT";
-        let contents = "\
-Rust:
-safe, fast, productive.
-Pick three.
-Trust me.";
-
-        assert_eq!(
-            vec!["Rust:", "Trust me."],
-            search_case_insensitive(query, contents)
-        );
-    }
-}
-
-pub fn search_case_insensitive<'a>(query: &str, contents: &'a str) -> Vec<&'a str> {
-    let query = query.to_lowercase();
-    let mut results: Vec<&str> = Vec::new();
-    for line in contents.lines() {
-        if line.to_lowercase().contains(&query) {
-            results.push(line);
-        }
-    }
-    results
-}
-
-pub fn search<'a>(query: &str, contents: &'a str) -> Vec<&'a str> {
-    let mut results: Vec<&str> = Vec::new();
-    for line in contents.lines() {
-        if line.contains(query) {
-            results.push(line);
-        }
-    }
-    results
-}
+mod anygrep;
 
 pub fn run(config: Config) -> Result<(), Box<dyn Error>> {
     let contents = fs::read_to_string(config.file_path)?;
-    let results = if config.ignore_case {
-        search_case_insensitive(&config.query, &contents)
-    } else {
-        search(&config.query, &contents)
+
+    let results = match (config.read_xml_key, config.ignore_case) {
+        (true, true) => android_strgrep::search_case_insensitive(&config.query, &contents)?,
+        (true, false) => android_strgrep::search(&config.query, &contents)?,
+        (false, true) => minigrep::search_case_insensitive(&config.query, &contents),
+        (false, false) => minigrep::search(&config.query, &contents),
     };
+
     for line in results {
         println!("{}", line);
     }
@@ -68,6 +22,7 @@ pub struct Config {
     pub query: String,
     pub file_path: String,
     pub ignore_case: bool,
+    pub read_xml_key: bool,
 }
 
 impl Config {
@@ -86,14 +41,21 @@ impl Config {
         // .is_ok();
 
         // GPT 추천
-        let ignore_case = env::var("IGNORE_CASE")
-            .map(|value| value.parse::<i32>().unwrap_or(0) == 1)
-            .unwrap_or(false);
+        let ignore_case = read_integer_env_var("IGNORE_CASE") == 1;
+        let read_xml_key = read_integer_env_var("READ_XML_KEY") == 1;
 
         Ok(Config {
             query,
             file_path,
             ignore_case,
+            read_xml_key,
         })
     }
+}
+
+fn read_integer_env_var(key: &str) -> i32 {
+    env::var(key)
+        .map(|value| value.parse::<i32>())
+        .unwrap_or(Ok(0))
+        .unwrap_or(0)
 }
