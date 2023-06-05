@@ -6,8 +6,8 @@ pub fn run(config: Config) -> Result<(), Box<dyn Error>> {
     let contents = fs::read_to_string(config.file_path)?;
 
     let results = match (config.read_xml_key, config.ignore_case) {
-        (true, true) => android_strgrep::search_case_insensitive(&config.query, &contents)?,
-        (true, false) => android_strgrep::search(&config.query, &contents)?,
+        (true, true) => android_strgrep::search_case_insensitive(&config.query, &contents),
+        (true, false) => android_strgrep::search(&config.query, &contents),
         (false, true) => minigrep::search_case_insensitive(&config.query, &contents),
         (false, false) => minigrep::search(&config.query, &contents),
     };
@@ -26,19 +26,18 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn build(args: &[String]) -> Result<Config, &'static str> {
-        if args.len() < 3 {
-            return Err("not enoungh arguments");
-        }
-        let query = args[1].clone();
-        let file_path = args[2].clone();
+    pub fn build(mut args: impl Iterator<Item = String>) -> Result<Config, &'static str> {
+        args.next(); // ignore name of the program
 
-        // 내가 적은 구문
-        // let ignore_case = match env::var("IGNORE_CASE") {
-        //     Ok(value) => Ok(value.parse::<i32>().unwrap() == 1),
-        //     Err(e) => Err(e),
-        // }
-        // .is_ok();
+        let query = match args.next() {
+            Some(arg) => arg,
+            None => return Err("Didn't get a query string"),
+        };
+
+        let file_path = match args.next() {
+            Some(arg) => arg,
+            None => return Err("Didn't get a file path"),
+        };
 
         // GPT 추천
         let ignore_case = read_integer_env_var("IGNORE_CASE") == 1;

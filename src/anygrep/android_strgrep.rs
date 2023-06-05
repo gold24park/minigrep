@@ -12,48 +12,40 @@ mod android_strgrep_tests {
         let query = "Name";
         let content = r#"<string name="string_name">text_string</string>"#;
         let result: Vec<&str> = vec![];
-        assert_eq!(result, search(query, content).unwrap())
+        assert_eq!(result, search(query, content))
     }
 
     #[test]
     fn case_insensitive() {
         let query = "Name";
         let content = r#"<string name="string_name">text_string</string>"#;
-        assert_eq!(
-            vec!["string_name"],
-            search_case_insensitive(query, content).unwrap()
-        )
+        assert_eq!(vec!["string_name"], search_case_insensitive(query, content))
     }
 }
 
-pub fn search<'a>(query: &str, content: &'a str) -> Result<Vec<&'a str>, Box<dyn Error>> {
-    let mut results = Vec::new();
-    let re = Regex::new(r#"<string name="(.+?)">"#)?;
-    for line in content.lines() {
-        if let Some(caps) = re.captures(line) {
-            let key = caps.get(1).map_or("", |m| m.as_str());
-            if key.contains(&query) {
-                results.push(key);
-            }
-        }
+pub fn search<'a>(query: &str, content: &'a str) -> Vec<&'a str> {
+    if let Ok(re) = Regex::new(r#"<string name="(.+?)">"#) {
+        content
+            .lines()
+            .filter_map(|line| re.captures(line).and_then(|caps| caps.get(1)))
+            .filter(|key| key.as_str().contains(query))
+            .map(|key| key.as_str())
+            .collect()
+    } else {
+        vec![]
     }
-    Ok(results)
 }
 
-pub fn search_case_insensitive<'a>(
-    query: &str,
-    content: &'a str,
-) -> Result<Vec<&'a str>, Box<dyn Error>> {
+pub fn search_case_insensitive<'a>(query: &str, content: &'a str) -> Vec<&'a str> {
     let query = query.to_lowercase();
-    let mut results = Vec::new();
-    let re = Regex::new(r#"<string name="(.+?)">"#)?;
-    for line in content.lines() {
-        if let Some(caps) = re.captures(line) {
-            let key = caps.get(1).map_or("", |m| m.as_str());
-            if key.to_lowercase().contains(&query) {
-                results.push(key);
-            }
-        }
+    if let Ok(re) = Regex::new(r#"<string name="(.+?)">"#) {
+        content
+            .lines()
+            .filter_map(|line| re.captures(line).and_then(|caps| caps.get(1)))
+            .filter(|key| key.as_str().to_lowercase().contains(&query))
+            .map(|key| key.as_str())
+            .collect()
+    } else {
+        vec![]
     }
-    Ok(results)
 }
